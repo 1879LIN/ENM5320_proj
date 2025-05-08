@@ -399,6 +399,137 @@ class H2_sparse(nn.Module):
         NNoutput = Y.transpose(1, 2)
 
         return NNoutput
+    
+
+
+
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class H2_Global(nn.Module):
+    """
+    Global Hamiltonian Neural Network using Symplectic Euler.
+    Input: [B, d, 1] where d = nf = p + q (must be even)
+    """
+
+    def __init__(self, n_layers, t_end, nf=8, random=True):
+        super().__init__()
+        assert nf % 2 == 0, "nf must be even to split into q and p"
+
+        self.n_layers = n_layers
+        self.h = t_end / n_layers
+        self.nf = nf
+        self.act = nn.Tanh()
+
+        if random:
+            K = torch.randn(nf, nf, n_layers)
+            b = torch.randn(nf, 1, n_layers)
+        else:
+            K = torch.ones(nf, nf, n_layers)
+            b = torch.zeros(nf, 1, n_layers)
+
+        self.K = nn.Parameter(K, requires_grad=True)
+        self.b = nn.Parameter(b, requires_grad=True)
+
+    def forward(self, Y0, ini=0, end=None):
+        # Input shape: [B, nf, 1]
+        Y = Y0.clone()
+        if end is None:
+            end = self.n_layers
+
+        for j in range(ini, end):
+            # Split q and p, shape: [B, nf/2]
+            q = Y[:, :self.nf//2, :].squeeze(-1)
+            p = Y[:, self.nf//2:, :].squeeze(-1)
+
+            # Update p: p = p - h * dH/dq
+            W_q1 = self.K[:self.nf//2, :self.nf//2, j].T
+            b_q1 = self.b[:self.nf//2, 0, j]
+            W_q2 = self.K[self.nf//2:, :self.nf//2, j]
+            hidden_q = self.act(F.linear(q, W_q1, b_q1))
+            dp = F.linear(hidden_q, W_q2)
+            p_new = p - self.h * dp
+
+            # Update q: q = q + h * dH/dp (use p_new here for symplectic step)
+            W_p1 = self.K[self.nf//2:, self.nf//2:, j].T
+            b_p1 = self.b[self.nf//2:, 0, j]
+            W_p2 = self.K[:self.nf//2, self.nf//2:, j]
+            hidden_p = self.act(F.linear(p_new, W_p1, b_p1))
+            dq = F.linear(hidden_p, W_p2)
+            q_new = q + self.h * dq
+
+            # Stack back to [B, nf, 1]
+            Y = torch.cat((q_new.unsqueeze(-1), p_new.unsqueeze(-1)), dim=1)
+
+        return Y
+
+    def getK(self):
+        return self.K
+
+    def getb(self):
+        return self.b
+
+class H1_Global(nn.Module):
+    """
+    Global Hamiltonian Neural Network using Forward Euler.
+    Input: [B, d, 1] where d = nf = p + q (must be even)
+    """
+    def __init__(self, n_layers, t_end, nf=8, random=True, select_j='J1'):
+        super().__init__()
+        assert nf % 2 == 0, "nf must be even to split into q and p"
+
+        self.n_layers = n_layers
+        self.h = t_end / n_layers
+        self.nf = nf
+        self.act = nn.Tanh()
+
+        if random:
+            K = torch.randn(nf, nf, n_layers)
+            b = torch.randn(nf, 1, n_layers)
+        else:
+            K = torch.ones(nf, nf, n_layers)
+            b = torch.zeros(nf, 1, n_layers)
+
+        self.K = nn.Parameter(K, requires_grad=True)
+        self.b = nn.Parameter(b, requires_grad=True)
+
+        if select_j == 'J1':
+            j_identity = torch.eye(nf // 2)
+            j_zeros = torch.zeros(nf // 2, nf // 2)
+            self.J = torch.cat((torch.cat((j_zeros, j_identity), 1),
+                                torch.cat((-j_identity, j_zeros), 1)), 0)
+        else:
+            j_aux = np.hstack((np.zeros(1), np.ones(nf - 1)))
+            J = j_aux
+            for j in range(nf - 1):
+                j_aux = np.hstack((-1 * np.ones(1), j_aux[:-1]))
+                J = np.vstack((J, j_aux))
+            self.J = torch.tensor(J, dtype=torch.float32)
+
+    def forward(self, Y0, ini=0, end=None):
+        # Input shape: [B, nf, 1]
+        Y = Y0.squeeze(-1)  # [B, nf]
+        if end is None:
+            end = self.n_layers
+
+        for j in range(ini, end):
+            # Forward Euler step
+            hidden = self.act(F.linear(Y, self.K[:, :, j].T, self.b[:, 0, j]))
+            update = F.linear(hidden, torch.matmul(self.J, self.K[:, :, j]))
+            Y = Y + self.h * update
+
+        return Y.unsqueeze(-1)  # Back to [B, nf, 1]
+
+    def getK(self):
+        return self.K
+
+    def getb(self):
+        return self.b
+
+    def getJ(self):
+        return self.J
+
 
 
 def get_intermediate_states(model, Y0):
