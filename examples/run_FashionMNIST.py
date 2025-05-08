@@ -148,7 +148,7 @@ if __name__ == '__main__':
     use_cuda = torch.cuda.is_available()
     batch_size = 100
     test_batch_size = 1000
-    lr = 0.005
+    lr = 0.001
     gamma = 0.8
     epochs = 20  # Increased epochs for Fashion MNIST
     seed = np.random.randint(0, 1000)
