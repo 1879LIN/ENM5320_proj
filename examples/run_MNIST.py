@@ -23,6 +23,7 @@ from integrators.integrators import MS1, H1, H2, H2_Global, H1_Global
 from regularization.regularization import regularization
 import argparse
 import matplotlib.pyplot as plt
+from integrators.CNN_DNN import CNN_DNN, train_cnn_dnn
 
 
 class Net(nn.Module):
@@ -343,15 +344,20 @@ if __name__ == '__main__':
         h = 0.5
         wd = 1e-3
         alpha = 1e-3
+    elif args.net_type == 'CNN_DNN':
+        h = None  # Not used for CNN_DNN
+        wd = 1e-3
+        alpha = 1e-3
     else:
         raise ValueError("%s model is not yet implemented" % args.net_type)
 
     # Define the net model
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {'num_workers': 20, 'pin_memory': True} if use_cuda else {}
-    #model = Net(nf=16, n_layers=args.n_layers, h=h, net_type=args.net_type).to(device)
-    #model = Net_Global(nf=16, n_layers=args.n_layers, h=h, net_type=args.net_type).to(device)
-    model = CNN_DNN(nf=16, n_layers=args.n_layers).to(device)
+    if args.net_type == 'CNN_DNN':
+        model = CNN_DNN(nf=16, n_layers=args.n_layers).to(device)
+    else:
+        model = Net(nf=16, n_layers=args.n_layers, h=h, net_type=args.net_type).to(device)
 
 
     print("\n------------------------------------------------------------------")
@@ -386,8 +392,10 @@ if __name__ == '__main__':
 
     # Training
     for epoch in range(1, epochs + 1):
-        #train(model, device, train_loader, optimizer, epoch, alpha, out)
-        train_cnn_dnn(model, device, train_loader, optimizer, epoch, out)
+        if args.net_type == 'CNN_DNN':
+            train_cnn_dnn(model, device, train_loader, optimizer, epoch, out)
+        else:
+            train(model, device, train_loader, optimizer, epoch, alpha, out)
         test_acc = test(model, device, test_loader, out)
         # Results over training set after training
         train_loss = 0
