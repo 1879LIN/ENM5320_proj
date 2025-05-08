@@ -159,24 +159,24 @@ if __name__ == '__main__':
 
     if args.net_type == 'MS1':
         h = 0.4
-        wd = 1e-3
-        alpha = 1e-3
+        wd = 1.5e-3  # Increased weight decay
+        alpha = 8e-4  # Adjusted regularization
     elif args.net_type == 'H1_J1':
         h = 0.5
-        wd = 1e-3
-        alpha = 1e-3
+        wd = 1.5e-3  # Increased weight decay
+        alpha = 8e-4  # Adjusted regularization
     elif args.net_type == 'H1_J2':
         h = 0.05
-        wd = 2e-4
+        wd = 3e-4  # Increased weight decay
         alpha = 1e-3
     elif args.net_type == 'H2':
         h = 0.5
-        wd = 1e-3
-        alpha = 1e-3
+        wd = 1.5e-3  # Increased weight decay
+        alpha = 8e-4  # Adjusted regularization
     elif args.net_type == 'CNN_DNN':
         h = None  # Not used for CNN_DNN
-        wd = 1e-3
-        alpha = 1e-3
+        wd = 1e-3  # Keep original weight decay for CNN
+        alpha = 1e-3  # Keep original regularization for CNN
     else:
         raise ValueError("%s model is not yet implemented" % args.net_type)
 
@@ -184,9 +184,9 @@ if __name__ == '__main__':
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {'num_workers': 20, 'pin_memory': True} if use_cuda else {}
     if args.net_type == 'CNN_DNN':
-        model = CNN_DNN(nf=32, n_layers=args.n_layers).to(device)
+        model = CNN_DNN(nf=32, n_layers=args.n_layers).to(device)  # Keep original features for CNN
     else:
-        model = Net(nf=32, n_layers=args.n_layers, h=h, net_type=args.net_type).to(device)
+        model = Net(nf=48, n_layers=args.n_layers, h=h, net_type=args.net_type).to(device)  # Increased features for HNN
 
     print("\n------------------------------------------------------------------")
     print(f"Fashion MNIST dataset - {args.net_type}-DNN - {args.n_layers} layers")
