@@ -456,7 +456,7 @@ if __name__ == '__main__':
             model,
             save_path=f"mnist_grad_norms_{args.n_layers}_layers.png",
             title=f"Gradient Norms During Training: HDNN ({args.n_layers} Layers)",
-            ylim=(0, 0.5)
+            ylim=(0, 0.05)
             #label=f"({args.n_layers})"
         )
     
