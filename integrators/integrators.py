@@ -244,7 +244,6 @@ class H1(nn.Module):
         return self.J
 
     def forward(self, Y0, ini=0, end=None):
-
         dim = len(Y0.shape)
         Y = Y0.transpose(1, dim-1)
 

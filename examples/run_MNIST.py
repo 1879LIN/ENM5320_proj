@@ -41,14 +41,15 @@ class Net(nn.Module):
         else:
             raise ValueError("%s model is not yet implemented for MNIST" % net_type)
         #self.hamiltonian = MS1(n_layers=n_layers, t_end=h * n_layers, nf=nf)
-        self.fc_end = nn.Linear(nf*28*28, 10)
+        self.fc_end = nn.Linear(nf, 10)
         self.nf = nf
 
     def forward(self, x):
-        x = self.conv1(x)
+        x = self.conv1(x)                        # [B, nf, 28, 28]
         x = x.view(x.size(0), self.nf, -1)       # [B, nf, 784]
+        x = x.mean(dim=2, keepdim=True)          # [B, nf, 1]
         x = self.hamiltonian(x)
-        x = x.reshape(-1, self.nf*28*28)
+        x = x.view(x.size(0), -1)                # [B, nf]
         x = self.fc_end(x)
         output = F.log_softmax(x, dim=1)
         return output
@@ -173,17 +174,22 @@ def train(model, device, train_loader, optimizer, epoch, alpha, out):
 
         optimizer.zero_grad()
 
-        # === Forward pass for gradient tracking ===
+        # Use encode if available (for Net_Global), otherwise fallback
         if hasattr(model, 'encode'):
             latent = model.encode(data)            # [B, nf, 1]
         else:
-            latent = data
+            latent = model.conv1(data)
+            latent = latent.view(latent.size(0), model.nf, -1)
+            latent = latent.mean(dim=2, keepdim=True)
 
         # Get Hamiltonian intermediate states
         Y_out = get_intermediate_states(model, latent)
 
-        # Final output layer manually (don't call full model again)
-        logits = model.fc(Y_out[-1].squeeze(2))     # [B, 10]
+        # Use the correct final linear layer for each model
+        if hasattr(model, 'fc_end'):
+            logits = model.fc_end(Y_out[-1].squeeze(2))  # For Net
+        else:
+            logits = model.fc(Y_out[-1].squeeze(2))      # For Net_Global
         loss = F.nll_loss(F.log_softmax(logits, dim=1), target)
 
         # Add Hamiltonian parameter regularization
@@ -281,33 +287,48 @@ def test(model, device, test_loader, out):
             100. * correct / len(test_loader.dataset)))
     return correct
 
-def plot_grad_norms(model, smooth=True, window=10):
+def plot_grad_norms(model, smooth=True, window=10, save_path=None, title=None, ylim=None, label=None):
     """
-    Plot the gradient norm evolution for each Hamiltonian layer.
-
-    Parameters:
-        model: your neural net that has model.grad_norm_history
-        smooth: whether to apply a moving average
-        window: window size for smoothing
+    Improved plot of gradient norm evolution for each layer.
+    Handles both list and dict grad_norm_history.
     """
     if not hasattr(model, 'grad_norm_history'):
         print("No gradient history found.")
         return
 
-    plt.figure(figsize=(12, 6))
+    import matplotlib.pyplot as plt
+    import numpy as np
 
-    for i, gnorms in enumerate(model.grad_norm_history):
+    plt.figure(figsize=(10, 5))
+    font = {'size': 14}
+    plt.rc('font', **font)
+
+    grad_hist = model.grad_norm_history
+    if isinstance(grad_hist, dict):
+        items = grad_hist.items()
+    else:
+        items = [(f'Layer {i+1}', gnorms) for i, gnorms in enumerate(grad_hist)]
+
+    for name, gnorms in items:
         if smooth and len(gnorms) > window:
-            # Apply moving average smoothing
             gnorms = np.convolve(gnorms, np.ones(window)/window, mode='valid')
-        plt.plot(gnorms, label=f'Layer {i+1}')
+        plt.plot(gnorms, label=str(name))
 
-    plt.title("Gradient Norms per Hamiltonian Layer During Training")
-    plt.xlabel("Training Step")
-    plt.ylabel("||∇Y_j||")
-    plt.legend()
-    plt.grid(True)
+    if title:
+        plt.title(title, fontsize=16)
+    else:
+        plt.title("Gradient Norms per Layer During Training", fontsize=16)
+    plt.xlabel("Training Step", fontsize=14)
+    plt.ylabel(r"$||\nabla Y_j||$", fontsize=14)
+    plt.legend(fontsize=12, ncol=2)
+    plt.grid(True, linestyle='--', alpha=0.7)
+    if ylim:
+        plt.ylim(*ylim)
+    if label:
+        plt.text(-0.1, 1.05, label, transform=plt.gca().transAxes, fontsize=16, fontweight='bold', va='top')
     plt.tight_layout()
+    if save_path:
+        plt.savefig(save_path)
     plt.show()
 
 
@@ -322,7 +343,8 @@ if __name__ == '__main__':
     test_batch_size = 1000
     lr = 0.01
     gamma = 0.8
-    epochs = 10
+    # epochs = 10
+    epochs = 1
     seed = np.random.randint(0, 1000)
     torch.manual_seed(seed)
     np.random.seed(seed)
@@ -352,13 +374,20 @@ if __name__ == '__main__':
     else:
         raise ValueError("%s model is not yet implemented" % args.net_type)
 
+    # Set nf based on model type
+    if args.net_type == 'CNN_DNN':
+        nf = 32
+    else:
+        nf = 16
+
     # Define the net model
+    print("Instantiating Net with nf =", nf)
     device = torch.device("cuda" if use_cuda else "cpu")
     kwargs = {'num_workers': 20, 'pin_memory': True} if use_cuda else {}
     if args.net_type == 'CNN_DNN':
-        model = CNN_DNN(nf=16, n_layers=args.n_layers).to(device)
+        model = CNN_DNN(nf=nf, n_layers=args.n_layers).to(device)
     else:
-        model = Net(nf=16, n_layers=args.n_layers, h=h, net_type=args.net_type).to(device)
+        model = Net_Global(nf=nf, n_layers=args.n_layers, h=h, net_type=args.net_type).to(device)
 
 
     print("\n------------------------------------------------------------------")
@@ -423,6 +452,12 @@ if __name__ == '__main__':
          100. * best_acc / len(test_loader.dataset), 100. * best_acc_train / len(train_loader.dataset)))
     
     if args.net_type != 'CNN_DNN':
-        plot_grad_norms(model)
+        plot_grad_norms(
+            model,
+            save_path=f"mnist_grad_norms_{args.n_layers}_layers.png",
+            title=f"Gradient Norms During Training: HDNN ({args.n_layers} Layers)",
+            ylim=(0, 0.5),
+            label=f"({args.n_layers})"
+        )
     
     print("------------------------------------------------------------------\n")
