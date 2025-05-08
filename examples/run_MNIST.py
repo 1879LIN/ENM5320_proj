@@ -18,7 +18,6 @@ import torch.optim as optim
 from torchvision import datasets, transforms
 from torch.optim.lr_scheduler import StepLR
 import numpy as np
-import matplotlib.pyplot as plt
 
 from integrators.integrators import MS1, H1, H2, H2_Global, H1_Global
 from regularization.regularization import regularization
@@ -257,51 +256,6 @@ def train_cnn_dnn(model, device, train_loader, optimizer, epoch, out):
                 epoch, batch_idx * len(data), len(train_loader.dataset),
                 100. * batch_idx / len(train_loader), loss.item(), correct, len(data)))
 
-def train_cnn_dnn(model, device, train_loader, optimizer, epoch, out):
-    model.train()
-
-    # Initialize gradient history tracker
-    if not hasattr(model, 'grad_norm_history'):
-        model.grad_norm_history = {}
-
-    for batch_idx, (data, target) in enumerate(train_loader):
-        data, target = data.to(device), target.to(device)
-
-        optimizer.zero_grad()
-
-        # Forward pass
-        output = model(data)  # [B, 10]
-        loss = F.nll_loss(output, target)
-
-        # Backward pass
-        loss.backward()
-
-        # Track gradients of fully connected layers
-        for name, param in model.named_parameters():
-            if param.grad is not None and 'fc' in name or 'middle_layers' in name:
-                if name not in model.grad_norm_history:
-                    model.grad_norm_history[name] = []
-                model.grad_norm_history[name].append(param.grad.norm().item())
-
-        # Optional debug print
-        if batch_idx % 100 == 0 and out > 0:
-            print(f"🧠 CNN-DNN Gradient Norms at Epoch {epoch}, Batch {batch_idx}")
-            for name, norms in model.grad_norm_history.items():
-                if len(norms) > 0:
-                    print(f"  ‣ {name}: ||∇|| = {norms[-1]:.6f}")
-
-        optimizer.step()
-
-        # Print training progress
-        if batch_idx % 100 == 0 and out > 0:
-            pred = output.argmax(dim=1, keepdim=True)
-            correct = pred.eq(target.view_as(pred)).sum().item()
-            print('\tTrain Epoch: {:2d} [{:5d}/{} ({:2.0f}%)]\tLoss: {:.6f}\tAccuracy: {}/{}\tGrad Norm: {:.6f}'.format(
-                epoch, batch_idx * len(data), len(train_loader.dataset),
-                100. * batch_idx / len(train_loader), loss.item(), correct, len(data), total_norm))
-    
-    return gradient_history
-
 
 def test(model, device, test_loader, out):
     model.eval()
@@ -431,7 +385,6 @@ if __name__ == '__main__':
     scheduler = StepLR(optimizer, step_size=1, gamma=gamma)
 
     # Training
-    all_gradients = []
     for epoch in range(1, epochs + 1):
         #train(model, device, train_loader, optimizer, epoch, alpha, out)
         train_cnn_dnn(model, device, train_loader, optimizer, epoch, out)
@@ -456,21 +409,9 @@ if __name__ == '__main__':
             best_acc = test_acc
             best_acc_train = correct
 
-    # Plot gradient history
-    plt.figure(figsize=(10, 5))
-    plt.plot(all_gradients)
-    plt.title('Gradient Norm History During Training')
-    plt.xlabel('Batch Number')
-    plt.ylabel('Gradient L2 Norm')
-    plt.yscale('log')  # Use log scale to better visualize small gradients
-    plt.grid(True)
-    plt.savefig('gradient_history.png')
-    plt.close()
-
     print("\nNetwork trained!")
     print('Test accuracy: {:.2f}%  - Train accuracy: {:.3f}% '.format(
          100. * best_acc / len(test_loader.dataset), 100. * best_acc_train / len(train_loader.dataset)))
     
     plot_grad_norms(model)
     print("------------------------------------------------------------------\n")
-
