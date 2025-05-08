@@ -173,6 +173,10 @@ if __name__ == '__main__':
         h = 0.5
         wd = 1e-3
         alpha = 1e-3
+    elif args.net_type == 'CNN_DNN':
+        h = None  # Not used for CNN_DNN
+        wd = 1e-3
+        alpha = 1e-3
     else:
         raise ValueError("%s model is not yet implemented" % args.net_type)
 
