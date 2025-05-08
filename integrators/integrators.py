@@ -248,12 +248,16 @@ class H1(nn.Module):
         dim = len(Y0.shape)
         Y = Y0.transpose(1, dim-1)
 
+        K = self.K.to(Y0.device)
+        b = self.b.to(Y0.device)
+        J = self.J.to(Y0.device)
+
         if end is None:
             end = self.n_layers
 
         for j in range(ini, end):
             Y = Y + self.h * F.linear(self.act(F.linear(
-                Y, self.K[:, :, j].transpose(0, 1), self.b[:, 0, j])), torch.matmul(self.J, self.K[:, :, j]))
+                Y, K[:, :, j].transpose(0, 1), b[:, 0, j])), torch.matmul(J, K[:, :, j]))
 
         NNoutput = Y.transpose(1, dim-1)
 
@@ -364,9 +368,9 @@ class H2_sparse(nn.Module):
         self.b = nn.Parameter(b, True)
 
         J = torch.zeros(self.nf, self.nf)
-        J[nf//2:, :nf//2] = -torch.ones(nf//2, nf//2)
-        J[:nf//2, nf//2:] = torch.ones(nf//2, nf//2)
-        self.J = J * mask_j
+        J[self.nf//2:, :self.nf//2] = -torch.ones(self.nf//2, self.nf//2)
+        J[:self.nf//2, self.nf//2:] = torch.ones(self.nf//2, self.nf//2)
+        self.J = J * self.mask_j
 
     def getK(self):
         return self.K
