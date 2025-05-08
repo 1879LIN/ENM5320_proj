@@ -423,5 +423,7 @@ if __name__ == '__main__':
     print('Test accuracy: {:.2f}%  - Train accuracy: {:.3f}% '.format(
          100. * best_acc / len(test_loader.dataset), 100. * best_acc_train / len(train_loader.dataset)))
     
-    plot_grad_norms(model)
+    if args.net_type != 'CNN_DNN':
+        plot_grad_norms(model)
+    
     print("------------------------------------------------------------------\n")
