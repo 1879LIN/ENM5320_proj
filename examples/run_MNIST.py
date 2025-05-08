@@ -159,6 +159,9 @@ def get_intermediate_states(model, Y0):
 
 
 def train(model, device, train_loader, optimizer, epoch, alpha, out):
+    from integrators.CNN_DNN import CNN_DNN
+    if isinstance(model, CNN_DNN):
+        raise RuntimeError("train() should not be called for CNN_DNN. Use train_cnn_dnn instead.")
     model.train()
 
     # Initialize gradient history tracker once
@@ -313,10 +316,6 @@ if __name__ == '__main__':
     parser.add_argument('--net_type', type=str, default='H1_J1')
     parser.add_argument('--n_layers', type=int, default=1)
     args = parser.parse_args()
-
-    args.net_type = 'H1_J2'
-    args.n_layers = 10
-
 
     use_cuda = torch.cuda.is_available()  # not no_cuda and
     batch_size = 100
