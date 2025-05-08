@@ -5,6 +5,8 @@ data/__init__.py
 data/datasets.py
 examples/__init__.py
 examples/run.py
+examples/run_CIFAR10.py
+examples/run_FashionMNIST.py
 examples/run_MLP.py
 examples/run_MNIST.py
 examples/run_distributed.py
@@ -16,6 +18,8 @@ hamiltonianNet.egg-info/SOURCES.txt
 hamiltonianNet.egg-info/dependency_links.txt
 hamiltonianNet.egg-info/requires.txt
 hamiltonianNet.egg-info/top_level.txt
+integrators/CNN_DNN.py
+integrators/CNN_HDNN.py
 integrators/__init__.py
 integrators/integrators.py
 regularization/__init__.py
