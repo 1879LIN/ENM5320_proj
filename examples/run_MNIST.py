@@ -171,8 +171,10 @@ def train(model, device, train_loader, optimizer, epoch, alpha, out):
         optimizer.zero_grad()
 
         # === Forward pass for gradient tracking ===
-        latent = model.encode(data)            # [B, nf, 1]
-        latent.requires_grad_(True)
+        if hasattr(model, 'encode'):
+            latent = model.encode(data)            # [B, nf, 1]
+        else:
+            latent = data
 
         # Get Hamiltonian intermediate states
         Y_out = get_intermediate_states(model, latent)
