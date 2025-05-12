@@ -9,6 +9,7 @@ examples/run_CIFAR10.py
 examples/run_FashionMNIST.py
 examples/run_MLP.py
 examples/run_MNIST.py
+examples/run_Pendulum.py
 examples/run_distributed.py
 examples/train_2d_example.py
 gradient_analysis/__init__.py

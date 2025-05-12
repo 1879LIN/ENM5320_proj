@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 class CNN_DNN(nn.Module):
     def __init__(self, nf=8, n_layers=2):
         super().__init__()
+        self.n_layers = n_layers
 
         self.encoder = nn.Sequential(
             nn.Conv2d(1, 16, kernel_size=3, stride=2, padding=1),

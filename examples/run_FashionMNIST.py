@@ -129,13 +129,21 @@ def plot_grad_norms(model, smooth=True, window=10):
             norms = np.convolve(norms, np.ones(window)/window, mode='valid')
         plt.plot(norms, label=name)
 
-    plt.title("Gradient Norms During Training")
+    # Get number of layers based on model type
+    if hasattr(model, 'hamiltonian'):
+        n_layers = model.hamiltonian.n_layers
+    elif hasattr(model, 'n_layers'):
+        n_layers = model.n_layers
+    else:
+        n_layers = sum(1 for m in model.modules() if isinstance(m, nn.Conv2d))
+
+    plt.title(f"Gradient Norms During Training - {n_layers} Layers")
     plt.xlabel("Training Step")
     plt.ylabel("||∇||")
     plt.legend()
     plt.grid(True)
     plt.tight_layout()
-    plt.savefig('fashion_mnist_gradients.png')
+    plt.savefig(f'fashion_mnist_gradients_{n_layers}layers.png')
     plt.close()
 
 
@@ -150,7 +158,7 @@ if __name__ == '__main__':
     test_batch_size = 1000
     lr = 0.001
     gamma = 0.8
-    epochs = 20  # Increased epochs for Fashion MNIST
+    epochs = 3  # Increased epochs for Fashion MNIST
     seed = np.random.randint(0, 1000)
     torch.manual_seed(seed)
     np.random.seed(seed)
